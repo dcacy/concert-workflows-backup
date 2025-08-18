@@ -1,0 +1,79 @@
+name: ingest zeta certs
+platform: node
+blocks:
+  - action: system/IBM/Concert/Certificates/List All Certificates Associated With
+      an Environment
+    name: IBM_1
+    inputs:
+      - name: authKey
+        value: '"ibmconcert/concert"'
+  - action: assign
+    name: Assign_1
+    variable: $result
+    value: $IBM_1.result
+variables:
+  - name: result
+    required: false
+    isInput: false
+    isOutput: true
+    level: INTERMEDIATE
+    type:
+      type: any
+    value: '""'
+  - name: certData
+    required: false
+    isInput: false
+    isOutput: false
+    level: INTERMEDIATE
+    type:
+      type: object
+    value: "{ \n\"components\": [\n\n  {\n    \"type\": \"certificate\",\n    \"ref\"\
+      : \"certificate:19641002000006\",\n    \"serial_number\": \"19641002000006\"\
+      ,\n    \"properties\": [\n      {\n        \"name\": \"subject\",\n        \"\
+      value\": \"CN=guest-ca-tor-1-ww.ca-tor.qq.appdomain.cloud\"\n      },\n    \
+      \  {\n        \"name\": \"issuer\",\n        \"value\": \"CN=A11,O=Test,C=AB\"\
+      \n      },\n      {\n        \"name\": \"validity_start_date\",\n        \"\
+      value\": \"2024-06-13 09:51:22 +0000 UTC\"\n      },\n      {\n        \"name\"\
+      : \"validity_end_date\",\n        \"value\": \"2025-08-01 09:51:22 +0000 UTC\"\
+      \n      },\n      {\n        \"name\": \"certificate_type\",\n        \"value\"\
+      : \"pfx\"\n      },\n      {\n        \"name\": \"dns_names\",\n        \"value\"\
+      : \"*.guest-ca-tor-1-ww.ca-tor.qq.appdomain.cloud\"\n      },\n      {\n   \
+      \     \"name\": \"owner\",\n        \"value\": \"xyzgTp@domain.com\"\n     \
+      \ },\n      {\n        \"name\": \"namespace\",\n        \"value\": \"openshift-config\"\
+      \n      },\n      {\n        \"name\": \"metadata\",\n        \"value\": \"\
+      {\\\"certificate_host\\\": \\\"\\\", \\\"service_info\\\": \\\"289****\\\",\
+      \ \\\"dn\\\": \\\"\\\\\\\\VED\\\\\\\\Policy\\\\\\\\Aperture\\\\\\\\1CMB-CESD-IT\\\
+      \\\\\\AI\\\\\\\\Non-******************************************\\\", \\\"senior_manager_contact\\\
+      \": \\\"mDkfg1ufap@domain.com\\\"}\"\n      }\n    ],\n    \"access_points\"\
+      : [\n      {\n        \"name\": \"foo\",\n        \"is_public\": \"false\",\n\
+      \        \"url\": \"http://foo.com\"\n      },\n      {\n        \"name\": \"\
+      bar\",\n        \"is_public\": \"false\",\n        \"url\": \"http://bar.com\"\
+      \n      }\n    ]\n  },\n    {\n    \"type\": \"certificate\",\n    \"ref\":\
+      \ \"certificate:19641002000007\",\n    \"serial_number\": \"19641002000007\"\
+      ,\n    \"properties\": [\n      {\n        \"name\": \"subject\",\n        \"\
+      value\": \"CN=guest-ca-tor-1-ww.ca-tor.qq.appdomain.cloud\"\n      },\n    \
+      \  {\n        \"name\": \"issuer\",\n        \"value\": \"CN=A11,O=Test,C=AB\"\
+      \n      },\n      {\n        \"name\": \"validity_start_date\",\n        \"\
+      value\": \"2024-06-13 09:51:22 +0000 UTC\"\n      },\n      {\n        \"name\"\
+      : \"validity_end_date\",\n        \"value\": \"2026-10-31 09:51:22 +0000 UTC\"\
+      \n      },\n      {\n        \"name\": \"certificate_type\",\n        \"value\"\
+      : \"pfx\"\n      },\n      {\n        \"name\": \"dns_names\",\n        \"value\"\
+      : \"*.guest-ca-tor-1-ww.ca-tor.qq.appdomain.cloud\"\n      },\n      {\n   \
+      \     \"name\": \"owner\",\n        \"value\": \"xyzgTp@domain.com\"\n     \
+      \ },\n      {\n        \"name\": \"namespace\",\n        \"value\": \"openshift-config\"\
+      \n      },\n      {\n        \"name\": \"metadata\",\n        \"value\": \"\
+      {\\\"certificate_host\\\": \\\"\\\", \\\"service_info\\\": \\\"289****\\\",\
+      \ \\\"dn\\\": \\\"\\\\\\\\VED\\\\\\\\Policy\\\\\\\\Aperture\\\\\\\\1CMB-CESD-IT\\\
+      \\\\\\AI\\\\\\\\Non-******************************************\\\", \\\"senior_manager_contact\\\
+      \": \\\"mDkfg1ufap@domain.com\\\"}\"\n      }\n    ],\n    \"access_points\"\
+      : [\n      {\n        \"name\": \"foo\",\n        \"is_public\": \"false\",\n\
+      \        \"url\": \"http://foo.com\"\n      },\n      {\n        \"name\": \"\
+      bar\",\n        \"is_public\": \"false\",\n        \"url\": \"http://bar.com\"\
+      \n      }\n    ]\n  }\n],\n\"dependencies\": [\n  {\n    \"ref\": \"environment:zeta\"\
+      ,\n    \"depends_on\": [\n      \"certificate:19641002000006\",\n      \"certificate:19641002000007\"\
+      \n    ]\n  }\n]\n}"
+meta:
+  workerGroup: default
+  layout: flat
+  version: 5
+finally: null

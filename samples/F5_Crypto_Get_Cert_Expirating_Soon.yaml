@@ -1,0 +1,132 @@
+name: F5_Crypto_Get_Cert_Expirating_Soon
+platform: node
+blocks:
+  - action: comment
+    value: Get our certificate list from f5
+  - name: getCerts
+    action: system/f5/BigIP/SYS/Get Crypto Cert List
+    inputs:
+      - name: authKey
+        value: '""'
+  - name: eachCert
+    action: foreach
+    list: $getCerts.result.items
+    blocks:
+      - action: comment
+        value: "If the expiration date is less than $Warning_Period_Days from right\
+          \ now, we push it into our list array."
+      - name: _A3
+        action: if
+        condition: (Date.parse( $eachCert.item.apiRawValues.expiration ) - Date.now())
+          < ( $Warning_Period_Days * 86400000 )
+        then:
+          - name: expiresSoon
+            action: system/Common/Array/Array Push
+            inputs:
+              - name: array
+                value: $Certs_and_Expirations
+              - name: item
+                value: "{ \"Certificate\": $eachCert.item.name, \"Expiration\": $eachCert.item.apiRawValues.expiration\
+                  \ }"
+        else: []
+  - action: comment
+    value: Begin building our HTML message by assigning the opening text to the $Email_HTML
+      variable
+  - name: _A10
+    action: assign
+    variable: $Email_HTML
+    value: '"<p><h2>The following certificates on your Delaware f5 BigIP will be expiring
+      within " + $Warning_Period_Days + " days:</h2></p>"'
+  - action: comment
+    value: Loop through the list we made earlier and add a line to our HTML message
+      for each entry
+  - name: eachExpiringSoon
+    action: foreach
+    list: $Certs_and_Expirations
+    blocks:
+      - name: _A11
+        action: assign
+        variable: $Email_HTML
+        value: $Email_HTML + "<p> Certificate " + $eachExpiringSoon.item.Certificate
+          + " expires " + $eachExpiringSoon.item.Expiration + " </p>"
+      - action: system/Common/Status Message Update
+        name: StatusMessageUpdate_1
+        inputs:
+          - name: message
+            value: "\"Working on Cert: \" + $eachExpiringSoon.item"
+  - action: comment
+    value: Turn the array from an object into text to use as the text version of the
+      email
+  - name: certListToText
+    action: system/Common/JSON/JSON Stringify
+    inputs:
+      - name: object
+        value: $Certs_and_Expirations
+  - action: comment
+    value: Send off our email message
+  - name: sendEmail
+    action: system/Common/Email/Email
+    inputs:
+      - name: from
+        value: '''"Pliant Demo" <demo@pliant.io>'''
+      - name: to
+        value: '"alerts@pliant.io"'
+      - name: subject
+        value: '"F5 Certificates Expiring within " + $Warning_Period_Days + " Days"'
+      - name: text
+        value: $certListToText.result
+      - name: html
+        value: $Email_HTML
+  - name: _A8
+    action: assign
+    variable: $Email_Result
+    value: $sendEmail
+variables:
+  - name: certlist
+    required: false
+    isInput: false
+    isOutput: false
+    level: INTERMEDIATE
+    type:
+      type: string
+    value: '""'
+  - name: Certs_and_Expirations
+    required: false
+    isInput: false
+    isOutput: true
+    level: INTERMEDIATE
+    type:
+      type: string
+    value: "[]"
+  - name: Warning_Period_Days
+    required: false
+    isInput: true
+    isOutput: false
+    level: INTERMEDIATE
+    type:
+      type: string
+    value: "990"
+  - name: Email_Result
+    required: false
+    isInput: false
+    isOutput: true
+    level: INTERMEDIATE
+    type:
+      type: string
+    value: '""'
+  - name: Email_HTML
+    required: false
+    isInput: false
+    isOutput: false
+    level: INTERMEDIATE
+    type:
+      type: string
+    value: '""'
+meta:
+  version: 5
+  description: "The Workflow reads the list of all SSL certificates on an f5 BigIP\
+    \ load balancer, compares the expiration dates against a warning period of N days,\
+    \ then assembles an HTML email of the results and sends it off via email. "
+  workerGroup: default
+  layout: flat
+finally: null

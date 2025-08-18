@@ -1,0 +1,44 @@
+name: Example_02_Call_Hello_World
+platform: node
+blocks:
+  - action: comment
+    value: "Hint: You can click the three dots next to the X in the top right of any\
+      \ block to view a list of possible actions. The Locate option will navigate\
+      \ the blocks palette to the folder containing that block. For blocks that reference\
+      \ other flows, you can use the \"Edit in new tab\" option to view and edit the\
+      \ flow. "
+  - name: A1
+    action: ibmconcert/User/samples/01 Hello_World
+    inputs:
+      - name: Repeat_Text
+        value: '"Goodbye world"'
+  - action: comment
+    value: "Here we use an assign block to take the value of the \"result\" property\
+      \ of the A1 block output and set the $result variable to have that value,"
+  - name: A2
+    action: assign
+    variable: $result
+    value: $A1.result
+  - action: comment
+    value: "Hint: Any Pliant variable can have properties or methods that you can\
+      \ reference by putting a '.' after the variable name. Some of those properties\
+      \ can have properties as well, similar to how JavaScript and other programming\
+      \ languages are structured. \nPliant has an auto-complete feature that will\
+      \ show you known properties and methods available for the current context  "
+variables:
+  - name: result
+    required: false
+    isInput: false
+    isOutput: true
+    level: INTERMEDIATE
+    type:
+      type: string
+    value: '""'
+meta:
+  version: 5
+  layout: flat
+  description: "This flow provides an example of how one Pliant workflow can call\
+    \ another. We call the \"Hello_World\" workflow here, and that workflow is represented\
+    \ as another action block in the workflow. "
+  workerGroup: default
+finally: null
