@@ -1,0 +1,147 @@
+name: Discovery_of_all_certificates
+platform: node
+blocks:
+  - action: comment
+    value: Fetch certificates from Windows Server
+  - action: system/Ansible/Playbook
+    name: fetchCertsfromWindows
+    inputs:
+      - name: authKey
+        value: $service_auth
+      - name: playbook
+        value: "`---\n- name: Show all self-signed certificates in Local Machine stores\n\
+          \  hosts: windows\n  gather_facts: no\n  tasks:\n    - name: Search for\
+          \ self-signed certificates in all stores\n      ansible.windows.win_shell:\
+          \ |\n        $stores = @(\"Root\", \"My\", \"CA\", \"TrustedPeople\")\n\
+          \        $allCerts = Get-ChildItem -Path Cert:\\LocalMachine\\Root, Cert:\\\
+          LocalMachine\\CA, Cert:\\LocalMachine\\My, Cert:\\LocalMachine\\TrustedPeople\n\
+          \        $selfSignedCerts = @()\n\n        foreach ($store in $stores) {\n\
+          \            $selfSignedCerts += Get-ChildItem -Path \"Cert:\\LocalMachine\\\
+          $store\" | Select-Object Thumbprint, Subject, NotAfter, NotBefore, Issuer,\
+          \ SerialNumber, DnsNameList,\n            @{Name=\"Store\"; Expression={$store}},\
+          \ \n            @{Name=\"CertificateType\"; Expression={\n             \
+          \   if ($_.Extensions | Where-Object { $_.Oid.FriendlyName -eq \"Basic Constraints\"\
+          \ -and $_.Format(0) -match \"Subject Type=CA\" }) {\n                  \
+          \  \"CA\"\n                } else {\n                    \"Self-Signed\"\
+          \n                }\n            }}\n        }\n\n        $selfSignedCerts\
+          \ | ConvertTo-Json\n      register: all_certificates\n\n    - name: Parse\
+          \ self-signed certificates\n      set_fact:\n        all_certificates_data:\
+          \ \"{{ all_certificates.stdout | from_json }}\"`"
+  - action: assign
+    name: GetResult
+    variable: $result
+    value: $fetchCertsfromWindows.result
+  - action: assign
+    name: GetCertificatetasks
+    variable: $certificates
+    value: "$result.plays[0].tasks[0].hosts"
+    breakpoint: enabled
+  - name: GetCertificateKey
+    function: " $firstKey = Object.keys($certificates)[0];"
+    breakpoint: enabled
+  - action: assign
+    name: Assign_1
+    variable: $api_server
+    value: $firstKey
+  - action: assign
+    name: GetCertificates
+    value: "$certificates[$firstKey].stdout_lines"
+    variable: $finalcertificates
+    breakpoint: enabled
+  - action: comment
+    value: Transform data to publish to Concert
+  - action: ./Create a JSON of Certificate
+    name: CreateJsonfromCerts
+    inputs:
+      - name: certificates
+        value: $finalcertificates
+      - name: concert_auth
+        value: $concert_auth
+      - name: env_name
+        value: $env_name
+      - name: api_server
+        value: $firstKey
+    breakpoint: enabled
+  - action: assign
+    name: assignResults
+    value: $CreateJsonfromCerts.result
+    variable: $result
+    breakpoint: enabled
+variables:
+  - name: result
+    required: false
+    isInput: false
+    isOutput: true
+    level: INTERMEDIATE
+    type:
+      type: any
+    value: '""'
+  - name: concert_auth
+    required: false
+    isInput: true
+    isOutput: false
+    level: INTERMEDIATE
+    type:
+      type: string
+    value: '""'
+    meta:
+      authType: Common/SSH
+      subType: authentication
+  - name: service_auth
+    required: false
+    isInput: true
+    isOutput: false
+    level: INTERMEDIATE
+    type:
+      type: string
+    value: '""'
+    meta:
+      authType: Common/SSH
+      subType: authentication
+  - name: certificates
+    required: false
+    isInput: false
+    isOutput: false
+    level: INTERMEDIATE
+    type:
+      type: array
+    value: "[]"
+  - name: finalcertificates
+    required: false
+    isInput: false
+    isOutput: false
+    level: INTERMEDIATE
+    type:
+      type: array
+    value: "[]"
+  - name: firstKey
+    required: false
+    isInput: false
+    isOutput: false
+    level: INTERMEDIATE
+    type:
+      type: string
+    value: '""'
+  - name: env_name
+    required: false
+    isInput: true
+    isOutput: false
+    level: INTERMEDIATE
+    type:
+      type: string
+    value: '""'
+  - name: api_server
+    required: false
+    isInput: false
+    isOutput: false
+    level: INTERMEDIATE
+    type:
+      type: string
+    value: '""'
+meta:
+  workerGroup: default
+  description: Get connection to windows connection and fetch all certificates.Create
+    the json which is supported by Concert
+  layout: flow
+  version: 5
+finally: null

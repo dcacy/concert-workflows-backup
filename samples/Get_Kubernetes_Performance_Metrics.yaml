@@ -1,0 +1,356 @@
+name: Get_Kubernetes_Performance_Metrics
+platform: node
+blocks:
+  - action: comment
+    value: "Gather pod health data, create a dictionary for later reference"
+  - action: system/Kubernetes/core_v1/listCoreV1PodForAllNamespaces
+    name: Kubernetes_Pods
+    inputs:
+      - name: authKey
+        value: $authKey
+  - action: foreach
+    name: ForEach_PodHealth
+    blocks:
+      - action: assign
+        name: Assign_4
+        variable: "$PodHealths[\"Pod-\" + $ForEach_PodHealth.item.metadata.namespace\
+          \ + '-'+ $ForEach_PodHealth.item.metadata.name]"
+        value: "{\n    restarts: 0,\n    containersReady: 0,\n    containersTotal:\
+          \ $ForEach_PodHealth.item.status.containerStatuses.length,\n    containersReadyPercent:\
+          \ 0\n    \n}"
+      - action: foreach
+        name: ForEach_ContainerHealth
+        blocks:
+          - action: assign
+            name: Assign_7
+            variable: "$PodHealths[\"Pod-\" + $ForEach_PodHealth.item.metadata.namespace\
+              \ + '-'+ $ForEach_PodHealth.item.metadata.name].restarts"
+            value: "$PodHealths[\"Pod-\" + $ForEach_PodHealth.item.metadata.namespace\
+              \ + '-'+ $ForEach_PodHealth.item.metadata.name].restarts + $ForEach_ContainerHealth.item.restartCount"
+          - action: if
+            name: If_2
+            then:
+              - action: assign
+                name: Assign_5
+                variable: "$PodHealths[\"Pod-\" + $ForEach_PodHealth.item.metadata.namespace\
+                  \ + '-'+ $ForEach_PodHealth.item.metadata.name].containersReady"
+                value: "$PodHealths[\"Pod-\" + $ForEach_PodHealth.item.metadata.namespace\
+                  \ + '-'+ $ForEach_PodHealth.item.metadata.name].containersReady\
+                  \ + 1"
+            else: []
+            condition: $ForEach_ContainerHealth.item.ready
+        list: $ForEach_PodHealth.item.status.containerStatuses
+      - action: assign
+        name: Assign_4_1
+        variable: "$PodHealths[\"Pod-\" + $ForEach_PodHealth.item.metadata.namespace\
+          \ + '-'+ $ForEach_PodHealth.item.metadata.name].containersReadyPercent"
+        value: |
+          Math.round( $PodHealths["Pod-" + $ForEach_PodHealth.item.metadata.namespace + '-'+ $ForEach_PodHealth.item.metadata.name].containersReady / $ForEach_PodHealth.item.status.containerStatuses.length * 100)
+    list: $Kubernetes_Pods.result.items
+  - action: comment
+    value: "Get a list of nodes, we will need to query Kubernetes about each node"
+  - action: system/Kubernetes/core_v1/listCoreV1Node
+    name: Kubernetes_GetNodes
+    inputs:
+      - name: authKey
+        value: $authKey
+    breakpoint: enabled
+  - action: comment
+    value: "Get a list of all namespaces, so we can have a count"
+  - action: system/Kubernetes/core_v1/listCoreV1Namespace
+    name: Kubernetes_GetNS
+    inputs:
+      - name: authKey
+        value: $authKey
+  - action: comment
+    value: Cycle through the nodes and get info about each one and the pods it runs
+  - action: foreach
+    name: ForEach_Node
+    blocks:
+      - action: assign
+        name: Assign_2
+        variable: $nodeImageStoreSize
+        value: "0"
+      - action: assign
+        name: Assign_1
+        variable: $clusterPodCapacity
+        value: $clusterPodCapacity + Number($ForEach_Node.item.status.capacity.pods)
+      - action: system/Kubernetes/KubernetesHttpRequest
+        name: Kubernetes_GetNodeStats
+        inputs:
+          - name: authKey
+            value: $authKey
+          - name: method
+            value: '"GET"'
+          - name: path
+            value: "`/api/v1/nodes/${$ForEach_Node.item.metadata.name}/proxy/stats/summary`"
+      - action: assign
+        name: Assign_1_1
+        variable: $clusterPodCount
+        value: $clusterPodCount + $Kubernetes_GetNodeStats.result.pods.length
+        breakpoint: enabled
+      - action: foreach
+        name: ForEach_ImgOnNode
+        blocks:
+          - action: assign
+            name: Assign_3
+            variable: $nodeImageStoreSize
+            value: $nodeImageStoreSize + $ForEach_ImgOnNode.item.sizeBytes
+        list: $ForEach_Node.item.status.images
+      - action: foreach
+        name: ForEach_Pod
+        blocks:
+          - action: system/Common/Array/Array Push
+            name: ArrayPush_PodStats
+            inputs:
+              - name: array
+                value: $result
+              - name: item
+                value: |-
+                  {
+                    "ObjectName": "Pod-" + $ForEach_Pod.item.podRef.namespace + '-'+ $ForEach_Pod.item.podRef.name,
+                    "ObjectDescription": "Kubernetes Pod Stats",
+                    "ObjectTypeName": "KubernetesPod",
+                    "Indicators": [{
+                      "Indicator_Type_Name": "ContainerCount",
+                      "Indicator_Type": "GAUGE",
+                      "Indicator_Display_As": "Number",
+                      "Indicator_Measure_As": "Number",
+                      "Value": $ForEach_Pod.item.containers.length
+                    },{
+                      "Indicator_Type_Name": "ContainerReadyPercent",
+                      "Indicator_Type": "GAUGE",
+                      "Indicator_Display_As": "Percent",
+                      "Indicator_Measure_As": "Percent",
+                      "Value": $PodHealths["Pod-" + $ForEach_Pod.item.podRef.namespace + '-'+ $ForEach_Pod.item.podRef.name].containersReadyPercent
+                    },{
+                      "Indicator_Type_Name": "Restarts",
+                      "Indicator_Type": "GAUGE",
+                      "Indicator_Display_As": "Number",
+                      "Indicator_Measure_As": "Number",
+                      "Value": $PodHealths["Pod-" + $ForEach_Pod.item.podRef.namespace + '-'+ $ForEach_Pod.item.podRef.name].restarts
+                    },{
+                      "Indicator_Type_Name": "CPU_usageNanoCores",
+                      "Indicator_Type": "COUNTER32",
+                      "Indicator_Display_As": "Number",
+                      "Indicator_Measure_As": "Number",
+                      "Value": $ForEach_Pod.item.cpu.usageNanoCores
+                    },{
+                      "Indicator_Type_Name": "CPU_usageCoreNanoSeconds",
+                      "Indicator_Type": "COUNTER32",
+                      "Indicator_Display_As": "Number",
+                      "Indicator_Measure_As": "Number",
+                      "Value": $ForEach_Pod.item.cpu.usageCoreNanoSeconds
+                    },{
+                      "Indicator_Type_Name": "MemoryUsed",
+                      "Indicator_Type": "GAUGE",
+                      "Indicator_Display_As": "Bytes",
+                      "Indicator_Measure_As": "Bytes",
+                      "Value": $ForEach_Pod.item.memory.usageBytes
+                    },{
+                      "Indicator_Type_Name": "NetworkRx",
+                      "Indicator_Type": "COUNTER32",
+                      "Indicator_Display_As": "Bytes",
+                      "Indicator_Measure_As": "Bytes",
+                      "Value": $ForEach_Pod.item.network.rxBytes
+                    },{
+                      "Indicator_Type_Name": "NetworkTx",
+                      "Indicator_Type": "COUNTER32",
+                      "Indicator_Display_As": "Bytes",
+                      "Indicator_Measure_As": "Bytes",
+                      "Value": $ForEach_Pod.item.network.txBytes
+                    }]
+                  }
+            breakpoint: enabled
+        list: $Kubernetes_GetNodeStats.result.pods
+      - action: system/Common/Array/Array Push
+        name: ArrayPush_NodeStats
+        inputs:
+          - name: array
+            value: $result
+          - name: item
+            value: |-
+              {
+                "ObjectName": "Node-"+$Kubernetes_GetNodeStats.result.node.nodeName,
+                "ObjectDescription": "Kubernetes Node Stats",
+                "ObjectTypeName": "KubernetesNode",
+                "Indicators": [{
+                  "Indicator_Type_Name": "PodCount",
+                  "Indicator_Type": "GAUGE",
+                  "Indicator_Display_As": "Number",
+                  "Indicator_Measure_As": "Number",
+                  "Value": $Kubernetes_GetNodeStats.result.pods.length
+                },{
+                  "Indicator_Type_Name": "CPU_usageNanoCores",
+                  "Indicator_Type": "COUNTER32",
+                  "Indicator_Display_As": "Number",
+                  "Indicator_Measure_As": "Number",
+                  "Value": $Kubernetes_GetNodeStats.result.node.cpu.usageNanoCores
+                },{
+                  "Indicator_Type_Name": "CPU_usageCoreNanoSeconds",
+                  "Indicator_Type": "COUNTER32",
+                  "Indicator_Display_As": "Number",
+                  "Indicator_Measure_As": "Number",
+                  "Value": $Kubernetes_GetNodeStats.result.node.cpu.usageCoreNanoSeconds
+                },{
+                  "Indicator_Type_Name": "MemoryTotal",
+                  "Indicator_Type": "GAUGE",
+                  "Indicator_Display_As": "Bytes",
+                  "Indicator_Measure_As": "Bytes",
+                  "Value": $Kubernetes_GetNodeStats.result.node.memory.availableBytes + $Kubernetes_GetNodeStats.result.node.memory.usageBytes
+                },{
+                  "Indicator_Type_Name": "MemoryUsed",
+                  "Indicator_Type": "GAUGE",
+                  "Indicator_Display_As": "Bytes",
+                  "Indicator_Measure_As": "Bytes",
+                  "Value": $Kubernetes_GetNodeStats.result.node.memory.usageBytes
+                },{
+                  "Indicator_Type_Name": "MemoryFree",
+                  "Indicator_Type": "GAUGE",
+                  "Indicator_Display_As": "Bytes",
+                  "Indicator_Measure_As": "Bytes",
+                  "Value": $Kubernetes_GetNodeStats.result.node.memory.availableBytes
+                },{
+                  "Indicator_Type_Name": "NetworkRx",
+                  "Indicator_Type": "COUNTER32",
+                  "Indicator_Display_As": "Bytes",
+                  "Indicator_Measure_As": "Bytes",
+                  "Value": $Kubernetes_GetNodeStats.result.node.network.rxBytes
+                },{
+                  "Indicator_Type_Name": "NetworkTx",
+                  "Indicator_Type": "COUNTER32",
+                  "Indicator_Display_As": "Bytes",
+                  "Indicator_Measure_As": "Bytes",
+                  "Value": $Kubernetes_GetNodeStats.result.node.network.txBytes
+                },{
+                  "Indicator_Type_Name": "FSTotal",
+                  "Indicator_Type": "GAUGE",
+                  "Indicator_Display_As": "Bytes",
+                  "Indicator_Measure_As": "Bytes",
+                  "Value": $Kubernetes_GetNodeStats.result.node.fs.capacityBytes
+                },{
+                  "Indicator_Type_Name": "FSUsed",
+                  "Indicator_Type": "GAUGE",
+                  "Indicator_Display_As": "Bytes",
+                  "Indicator_Measure_As": "Bytes",
+                  "Value": $Kubernetes_GetNodeStats.result.node.fs.usedBytes
+                },{
+                  "Indicator_Type_Name": "FSFree",
+                  "Indicator_Type": "GAUGE",
+                  "Indicator_Display_As": "Bytes",
+                  "Indicator_Measure_As": "Bytes",
+                  "Value": $Kubernetes_GetNodeStats.result.node.fs.availableBytes
+                },{
+                  "Indicator_Type_Name": "ImageStoreSize",
+                  "Indicator_Type": "GAUGE",
+                  "Indicator_Display_As": "Bytes",
+                  "Indicator_Measure_As": "Bytes",
+                  "Value": $nodeImageStoreSize
+                }]
+              }
+    list: $Kubernetes_GetNodes.result.items
+  - action: system/Common/Array/Array Push
+    name: ArrayPush_ClusterStats
+    inputs:
+      - name: array
+        value: $result
+      - name: item
+        value: |-
+          {
+            "ObjectName": "Cluster",
+            "ObjectDescription": "Kubernetes Clusterwide Stats",
+            "ObjectTypeName": "KubernetesCluster",
+            "Indicators": [{
+              "Indicator_Type_Name": "NodeCount",
+              "Indicator_Type": "GAUGE",
+              "Indicator_Display_As": "Number",
+              "Indicator_Measure_As": "Number",
+              "Value": $Kubernetes_GetNodes.result.items.length
+            },{
+              "Indicator_Type_Name": "NameSpaceCount",
+              "Indicator_Type": "GAUGE",
+              "Indicator_Display_As": "Number",
+              "Indicator_Measure_As": "Number",
+              "Value": $Kubernetes_GetNS.result.items.length
+            },{
+              "Indicator_Type_Name": "PodCapacity",
+              "Indicator_Type": "GAUGE",
+              "Indicator_Display_As": "Number",
+              "Indicator_Measure_As": "Number",
+              "Value": $clusterPodCapacity
+            },{
+              "Indicator_Type_Name": "PodCount",
+              "Indicator_Type": "GAUGE",
+              "Indicator_Display_As": "Number",
+              "Indicator_Measure_As": "Number",
+              "Value": $clusterPodCount
+            },{
+              "Indicator_Type_Name": "PodCapacityUsed",
+              "Indicator_Type": "GAUGE",
+              "Indicator_Display_As": "Percent",
+              "Indicator_Measure_As": "Percent",
+              "Value": Math.round($clusterPodCount/$clusterPodCapacity*100)
+            }]
+          }
+    breakpoint: enabled
+variables:
+  - name: result
+    required: false
+    isInput: false
+    isOutput: true
+    level: INTERMEDIATE
+    type:
+      type: array
+    value: "[]"
+  - name: authKey
+    required: true
+    isInput: true
+    isOutput: false
+    level: INTERMEDIATE
+    type:
+      type: string
+    value: '""'
+    meta:
+      authType: Kubernetes
+      subType: authentication
+  - name: clusterPodCapacity
+    required: false
+    isInput: false
+    isOutput: false
+    level: INTERMEDIATE
+    type:
+      type: number
+    value: "0"
+  - name: clusterPodCount
+    required: false
+    isInput: false
+    isOutput: false
+    level: INTERMEDIATE
+    type:
+      type: number
+    value: "0"
+  - name: nodeImageStoreSize
+    required: false
+    isInput: false
+    isOutput: false
+    level: INTERMEDIATE
+    type:
+      type: number
+    value: "0"
+  - name: PodHealths
+    required: false
+    isInput: false
+    isOutput: false
+    level: INTERMEDIATE
+    type:
+      type: object
+    value: "{}"
+meta:
+  version: 5
+  layout: flat
+  workerGroup: default
+  description: "Pulls stats from a Kubernetes cluster via the Kubernetes API. Returns\
+    \ stats for the cluster, each node, and each pod. Data returned is in an object/indicator\
+    \ format appropriate for insertion into SevOne for further monitoring, reporting,\
+    \ and alerting.  "
+finally: null
