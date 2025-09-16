@@ -1,0 +1,58 @@
+# Site settings
+title: HOWTO Back Up Concert Workflows to Git
+email: dcacy@us.ibm.com
+description: >
+  Follow these instructions to back up workflows to git (and restore!).
+lang: en-US
+
+baseurl: "/concert-workflows-backup" # the subpath of your site, e.g. /blog/
+url: https://dcacy.github.io # the base hostname & protocol for your site
+git_address: https://dcacy.github.io/concert-workflows-backup.git
+
+# theme options from https://bootswatch.com/3/
+# comment out this to use default Bootstrap
+# bootwatch: paper # cerulean cosmo custom cyborg darkly flatly journal lumen readable sandstone simplex slate solar spacelab superhero united yeti
+
+# Build settings
+markdown: kramdown
+highlighter: rouge
+# Plugins (previously gems:)
+# plugins:
+#   - jekyll-feed
+#   - jekyll-redirect-from
+#   - jekyll-seo-tag
+#   - jekyll-sitemap
+
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - .idea/
+  - .gitignore
+  - README.md
+  - vendor
+  - .history
+timezone: America/Chicago
+defaults:
+# - scope:
+#     path: _posts
+#     type: posts
+#   values:
+#     layout: post
+#     sectionid: blog
+
+- scope:
+    path: _docs
+    type: docs
+  values:
+    layout: docs
+    sectionid: docs
+    seo:
+      type: "WebPage"
+
+collections:
+  docs:
+    permalink: /:collection/:path/
+    output: true
+  # posts:
+  #   permalink: /blog/:year/:month/:day/:title/
+  #   output: true
