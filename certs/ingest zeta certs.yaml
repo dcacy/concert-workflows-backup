@@ -3,14 +3,89 @@ platform: node
 blocks:
   - action: system/IBM/Concert/Certificates/List All Certificates Associated With
       an Environment
-    name: IBM_1
+    name: listCerts
     inputs:
       - name: authKey
         value: '"ibmconcert/concert"'
+      - name: filter
+        value: '"environment_id:zeta"'
+  - action: comment
+    value: "iterate through list of certificates, creating an array of serial numbers"
+  - action: foreach
+    name: ForEach_cert
+    list: $listCerts.result.certificates
+    blocks:
+      - action: system/Common/Array/Array Push
+        name: ArrayPush_1
+        inputs:
+          - name: array
+            value: $certIds
+          - name: item
+            value: $ForEach_cert.item.serial_number
+      - action: assign
+        name: Assign_2
+        variable: $accessPoints
+        value: "[]"
+        skipped: true
+      - action: comment
+        value: get all the access points for a cert
+      - action: foreach
+        name: ForEach_access_points
+        list: $ForEach_cert.item.access_points
+        blocks:
+          - name: Function_1
+            function: $accessPointsIds.push($ForEach_access_points.item.id);
+            skipped: true
+          - action: system/Common/Array/Array Push
+            name: ArrayPush_3
+            inputs:
+              - name: array
+                value: $accessPointsIds
+              - name: item
+                value: $ForEach_access_points.item.id
+      - action: assign
+        name: Assign_5
+        variable: $accessPoints
+        value: "{\"access_points_ids\": $accessPointsIds, \"serial_number\": $ForEach_cert.item.serial_number\
+          \ }"
+        skipped: true
+      - action: system/Common/Array/Array Push
+        name: ArrayPush_5
+        inputs:
+          - name: array
+            value: $accessPoints
+          - name: item
+            value: "{\"access_points_ids\": $accessPointsIds, \"serial_number\": $ForEach_cert.item.serial_number\
+              \ }"
+  - action: system/Common/Array/Array Push
+    name: ArrayPush_4
+    inputs:
+      - name: array
+        value: $accessPoints
+      - name: item
+        value: "{\"access_points_ids\": $accessPointsIds, \"serial_number\": $ForEach_cert.item.serial_number\
+          \ }"
+    skipped: true
+  - action: system/Common/Array/Array Push
+    name: ArrayPush_2
+    inputs:
+      - name: array
+        value: $certsToDelete
+      - name: item
+        value: "{\"certificates\": $certIds}"
+    skipped: true
+  - action: assign
+    name: Assign_3
+    variable: $certsToDelete.certificates
+    value: $certIds
+  - action: assign
+    name: Assign_4
+    variable: $certsToDelete.access_points
+    value: $accessPoints
   - action: assign
     name: Assign_1
     variable: $result
-    value: $IBM_1.result
+    value: $certsToDelete
 variables:
   - name: result
     required: false
@@ -72,6 +147,38 @@ variables:
       \n      }\n    ]\n  }\n],\n\"dependencies\": [\n  {\n    \"ref\": \"environment:zeta\"\
       ,\n    \"depends_on\": [\n      \"certificate:19641002000006\",\n      \"certificate:19641002000007\"\
       \n    ]\n  }\n]\n}"
+  - name: certsToDelete
+    required: false
+    isInput: false
+    isOutput: false
+    level: INTERMEDIATE
+    type:
+      type: object
+    value: "{}"
+  - name: certIds
+    required: false
+    isInput: false
+    isOutput: false
+    level: INTERMEDIATE
+    type:
+      type: array
+    value: "[]"
+  - name: accessPoints
+    required: false
+    isInput: false
+    isOutput: false
+    level: INTERMEDIATE
+    type:
+      type: array
+    value: "[]"
+  - name: accessPointsIds
+    required: false
+    isInput: false
+    isOutput: false
+    level: INTERMEDIATE
+    type:
+      type: array
+    value: "[]"
 meta:
   workerGroup: default
   layout: flat
